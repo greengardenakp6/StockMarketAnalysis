@@ -1,272 +1,274 @@
-from flask import Flask, jsonify, request, send_from_directory
-from flask_cors import CORS
-import yfinance as yf
-import pandas as pd
-import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import io
-import base64
-import os
-from datetime import datetime, timedelta
-import json
+// Temporary standalone version that works without backend
+class StockAnalysisApp {
+    constructor() {
+        this.stocks = ['RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ITC.NS'];
+        this.initializeEventListeners();
+        this.setDefaultDates();
+        this.simulateAPIOnline();
+    }
 
-app = Flask(__name__)
-CORS(app)
+    simulateAPIOnline() {
+        // Simulate API being online for demo
+        document.getElementById('apiStatus').className = 'status-online';
+        document.getElementById('apiStatus').innerHTML = '<i class="fas fa-circle"></i> API: Online (Demo)';
+    }
 
-class StockAnalyzer:
-    def __init__(self):
-        self.stocks = ['RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ITC.NS']
-    
-    def fetch_stock_data(self, start_date, end_date):
-        """Fetch stock data from Yahoo Finance"""
-        try:
-            print(f"Fetching data from {start_date} to {end_date}")
-            data = yf.download(self.stocks, start=start_date, end=end_date, progress=False)
-            if data.empty:
-                return self.generate_sample_data(start_date, end_date)
-            return data['Close']
-        except Exception as e:
-            print(f"Error fetching data: {e}")
-            return self.generate_sample_data(start_date, end_date)
-    
-    def generate_sample_data(self, start_date, end_date):
-        """Generate realistic sample data"""
-        dates = pd.date_range(start=start_date, end=end_date, freq='D')
-        # Remove weekends
-        dates = dates[dates.dayofweek < 5]
+    setDefaultDates() {
+        const today = new Date();
+        const oneMonthAgo = new Date(today);
+        oneMonthAgo.setMonth(today.getMonth() - 1);
         
-        base_prices = {
-            'RELIANCE.NS': 2500,
-            'TCS.NS': 3500, 
-            'INFY.NS': 1800,
-            'HDFCBANK.NS': 1600,
-            'ITC.NS': 400
+        document.getElementById('startDate').value = this.formatDate(oneMonthAgo);
+        document.getElementById('endDate').value = this.formatDate(today);
+    }
+
+    formatDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    initializeEventListeners() {
+        document.getElementById('analyzeBtn').addEventListener('click', () => {
+            this.analyzeStocks();
+        });
+    }
+
+    async analyzeStocks() {
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+
+        if (!startDate || !endDate) {
+            this.showError('Please select both start and end dates');
+            return;
         }
-        
-        volatility = {
-            'RELIANCE.NS': 0.02,
-            'TCS.NS': 0.015,
-            'INFY.NS': 0.018,
-            'HDFCBANK.NS': 0.016,
-            'ITC.NS': 0.012
-        }
-        
-        data = {}
-        for stock in self.stocks:
-            prices = []
-            base_price = base_prices[stock]
-            current_price = base_price * (1 + np.random.uniform(-0.1, 0.1))
-            
-            for i, date in enumerate(dates):
-                # Add some trend and randomness
-                trend = np.sin(i * 0.1) * 0.001
-                random_change = np.random.normal(0, volatility[stock])
-                price_change = trend + random_change
-                current_price = current_price * (1 + price_change)
-                prices.append(current_price)
-            
-            data[stock] = pd.Series(prices, index=dates)
-        
-        return pd.DataFrame(data)
-    
-    def calculate_returns(self, data):
-        """Calculate daily returns"""
-        return data.pct_change().dropna()
-    
-    def perform_pca_analysis(self, returns):
-        """Perform PCA analysis on returns"""
-        cov_matrix = returns.cov()
-        eigenvalues, eigenvectors = np.linalg.eig(cov_matrix)
-        
-        # Sort eigenvalues and eigenvectors in descending order
-        sorted_indices = np.argsort(eigenvalues)[::-1]
-        eigenvalues = eigenvalues[sorted_indices]
-        eigenvectors = eigenvectors[:, sorted_indices]
-        
-        return cov_matrix, eigenvalues, eigenvectors
-    
-    def create_trend_chart(self, eigenvectors, eigenvalues):
-        """Create market trend visualization"""
-        plt.figure(figsize=(12, 8))
-        main_vector = eigenvectors[:, 0]
-        
-        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
-        bars = plt.bar(range(len(self.stocks)), main_vector, color=colors, alpha=0.8)
-        
-        plt.title('Stock Influence on Main Market Trend\n(First Principal Component)', 
-                 fontsize=16, fontweight='bold', pad=20)
-        plt.xlabel('Stocks', fontsize=12, fontweight='bold')
-        plt.ylabel('Eigenvector Value', fontsize=12, fontweight='bold')
-        
-        # Custom x-axis labels
-        stock_names = [stock.split('.')[0] for stock in self.stocks]
-        plt.xticks(range(len(self.stocks)), stock_names, rotation=45)
-        
-        # Add value labels on bars
-        for bar in bars:
-            height = bar.get_height()
-            plt.text(bar.get_x() + bar.get_width()/2., height,
-                    f'{height:.3f}', ha='center', va='bottom', fontweight='bold')
-        
-        plt.grid(axis='y', alpha=0.3)
-        plt.tight_layout()
-        
-        # Convert plot to base64
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
-        buffer.seek(0)
-        image_png = buffer.getvalue()
-        buffer.close()
-        plt.close()
-        
-        return base64.b64encode(image_png).decode('utf-8')
-    
-    def create_returns_chart(self, returns):
-        """Create cumulative returns chart"""
-        plt.figure(figsize=(12, 8))
-        cumulative_returns = (1 + returns).cumprod()
-        
-        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
-        
-        for i, stock in enumerate(self.stocks):
-            plt.plot(cumulative_returns.index, cumulative_returns[stock], 
-                    label=stock.split('.')[0], linewidth=2.5, color=colors[i],
-                    marker='o', markersize=3, alpha=0.8)
-        
-        plt.title('Cumulative Returns Over Time', fontsize=16, fontweight='bold', pad=20)
-        plt.xlabel('Date', fontsize=12, fontweight='bold')
-        plt.ylabel('Cumulative Returns', fontsize=12, fontweight='bold')
-        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-        plt.grid(True, alpha=0.3)
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        
-        # Convert plot to base64
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
-        buffer.seek(0)
-        image_png = buffer.getvalue()
-        buffer.close()
-        plt.close()
-        
-        return base64.b64encode(image_png).decode('utf-8')
-    
-    def create_correlation_heatmap(self, returns):
-        """Create correlation matrix heatmap"""
-        plt.figure(figsize=(10, 8))
-        correlation_matrix = returns.corr()
-        
-        im = plt.imshow(correlation_matrix, cmap='coolwarm', aspect='auto', vmin=-1, vmax=1)
-        
-        stock_names = [stock.split('.')[0] for stock in self.stocks]
-        plt.xticks(range(len(stock_names)), stock_names, rotation=45)
-        plt.yticks(range(len(stock_names)), stock_names)
-        
-        # Add correlation values as text
-        for i in range(len(stock_names)):
-            for j in range(len(stock_names)):
-                text = plt.text(j, i, f'{correlation_matrix.iloc[i, j]:.2f}',
-                               ha="center", va="center", color="white", 
-                               fontweight='bold', fontsize=10)
-        
-        plt.title('Stock Returns Correlation Matrix', fontsize=16, fontweight='bold', pad=20)
-        plt.colorbar(im)
-        plt.tight_layout()
-        
-        # Convert plot to base64
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
-        buffer.seek(0)
-        image_png = buffer.getvalue()
-        buffer.close()
-        plt.close()
-        
-        return base64.b64encode(image_png).decode('utf-8')
 
-analyzer = StockAnalyzer()
+        this.showLoading(true);
 
-@app.route('/')
-def serve_frontend():
-    return send_from_directory('.', 'index.html')
-
-@app.route('/<path:path>')
-def serve_static_files(path):
-    return send_from_directory('.', path)
-
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    return jsonify({
-        'status': 'healthy', 
-        'message': 'Premium Stock Analysis API is running',
-        'timestamp': datetime.now().isoformat()
-    })
-
-@app.route('/api/analyze', methods=['POST'])
-def analyze_stocks():
-    try:
-        data = request.get_json()
-        start_date = data.get('start_date', '2024-09-01')
-        end_date = data.get('end_date', '2024-10-01')
-        
-        print(f"Received analysis request: {start_date} to {end_date}")
-        
-        # Fetch and process data
-        stock_data = analyzer.fetch_stock_data(start_date, end_date)
-        returns = analyzer.calculate_returns(stock_data)
-        
-        if returns.empty:
-            return jsonify({
-                'success': False,
-                'error': 'No data available for the selected date range',
-                'message': 'Please select a different date range'
-            }), 400
-        
-        cov_matrix, eigenvalues, eigenvectors = analyzer.perform_pca_analysis(returns)
-        
-        # Prepare response data
-        response_data = {
-            'stock_prices': stock_data.tail(10).to_dict(),
-            'daily_returns': returns.tail(10).to_dict(),
-            'covariance_matrix': cov_matrix.to_dict(),
-            'eigenvalues': eigenvalues.tolist(),
-            'eigenvectors': eigenvectors.tolist(),
-            'analysis': {
-                'main_trend_stock': analyzer.stocks[np.argmax(np.abs(eigenvectors[:, 0]))],
-                'variance_explained': (eigenvalues[0] / np.sum(eigenvalues)) * 100,
-                'total_variance': np.sum(eigenvalues),
-                'number_of_days': len(stock_data)
+        // Simulate API call delay
+        setTimeout(() => {
+            try {
+                const analysis = this.generateDemoAnalysis(startDate, endDate);
+                this.displayResults(analysis);
+            } catch (error) {
+                this.showError('Demo analysis failed: ' + error.message);
+            } finally {
+                this.showLoading(false);
             }
+        }, 2000);
+    }
+
+    generateDemoAnalysis(startDate, endDate) {
+        // Generate demo data
+        return {
+            analysis: {
+                main_trend_stock: 'RELIANCE.NS',
+                variance_explained: 65.42,
+                total_variance: 0.000156,
+                number_of_days: 22
+            },
+            trend_chart: this.createDemoTrendChart(),
+            returns_chart: this.createDemoReturnsChart(),
+            correlation_chart: this.createDemoCorrelationChart(),
+            stock_prices: this.generateDemoPrices(),
+            eigenvalues: [0.000102, 0.000032, 0.000015, 0.000005, 0.000002],
+            eigenvectors: [
+                [0.5123, 0.4231, 0.3892, 0.3456, 0.2987],
+                [-0.3123, 0.5231, -0.2892, 0.4456, -0.1987],
+                [0.2123, -0.3231, 0.5892, -0.2456, 0.0987],
+                [-0.1123, -0.2231, -0.1892, 0.6456, 0.3987],
+                [0.0923, 0.1231, -0.0892, -0.1456, 0.7987]
+            ]
+        };
+    }
+
+    createDemoTrendChart() {
+        // Create a simple demo chart
+        const canvas = document.createElement('canvas');
+        canvas.width = 600;
+        canvas.height = 400;
+        const ctx = canvas.getContext('2d');
+        
+        // Draw chart background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw demo bars
+        const values = [0.5123, 0.4231, 0.3892, 0.3456, 0.2987];
+        const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd'];
+        const stockNames = ['RELIANCE', 'TCS', 'INFY', 'HDFC', 'ITC'];
+        
+        const barWidth = 80;
+        const spacing = 20;
+        const startX = 50;
+        const baseY = 300;
+        
+        values.forEach((value, index) => {
+            const x = startX + index * (barWidth + spacing);
+            const height = value * 400;
+            const y = baseY - height;
+            
+            ctx.fillStyle = colors[index];
+            ctx.fillRect(x, y, barWidth, height);
+            
+            // Labels
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(stockNames[index], x + barWidth/2, baseY + 20);
+            ctx.fillText(value.toFixed(3), x + barWidth/2, y - 10);
+        });
+        
+        ctx.font = 'bold 16px Arial';
+        ctx.fillStyle = '#2c3e50';
+        ctx.textAlign = 'center';
+        ctx.fillText('Market Trend Analysis (Demo)', canvas.width/2, 30);
+        
+        return canvas.toDataURL();
+    }
+
+    createDemoReturnsChart() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 600;
+        canvas.height = 400;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.font = 'bold 16px Arial';
+        ctx.fillStyle = '#2c3e50';
+        ctx.textAlign = 'center';
+        ctx.fillText('Cumulative Returns (Demo Data)', canvas.width/2, 30);
+        
+        ctx.fillStyle = '#666';
+        ctx.font = '14px Arial';
+        ctx.fillText('Backend connection required for real data', canvas.width/2, 200);
+        
+        return canvas.toDataURL();
+    }
+
+    createDemoCorrelationChart() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 600;
+        canvas.height = 400;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.font = 'bold 16px Arial';
+        ctx.fillStyle = '#2c3e50';
+        ctx.textAlign = 'center';
+        ctx.fillText('Correlation Matrix (Demo)', canvas.width/2, 30);
+        
+        return canvas.toDataURL();
+    }
+
+    generateDemoPrices() {
+        const prices = {};
+        const stocks = ['RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ITC.NS'];
+        const basePrices = [2500, 3500, 1800, 1600, 400];
+        
+        for (let i = 0; i < 5; i++) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const dateStr = date.toISOString().split('T')[0];
+            prices[dateStr] = {};
+            
+            stocks.forEach((stock, index) => {
+                prices[dateStr][stock] = basePrices[index] * (1 + Math.random() * 0.1);
+            });
         }
         
-        # Generate charts
-        response_data['trend_chart'] = analyzer.create_trend_chart(eigenvectors, eigenvalues)
-        response_data['returns_chart'] = analyzer.create_returns_chart(returns)
-        response_data['correlation_chart'] = analyzer.create_correlation_heatmap(returns)
-        
-        return jsonify({
-            'success': True,
-            'data': response_data,
-            'message': 'Analysis completed successfully'
-        })
-        
-    except Exception as e:
-        print(f"Error in analysis: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'message': 'Error performing stock analysis'
-        }), 500
+        return prices;
+    }
 
-@app.route('/api/stocks', methods=['GET'])
-def get_available_stocks():
-    return jsonify({
-        'stocks': analyzer.stocks,
-        'stock_names': [stock.split('.')[0] for stock in analyzer.stocks],
-        'count': len(analyzer.stocks)
-    })
+    displayResults(data) {
+        // Update metrics
+        document.getElementById('mainTrendStock').textContent = data.analysis.main_trend_stock.split('.')[0];
+        document.getElementById('varianceExplained').textContent = data.analysis.variance_explained.toFixed(2) + '%';
+        document.getElementById('totalVariance').textContent = data.analysis.total_variance.toFixed(6);
+        document.getElementById('tradingDays').textContent = data.analysis.number_of_days;
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(debug=True, host='0.0.0.0', port=port)
+        // Display charts
+        document.getElementById('trendChart').src = data.trend_chart;
+        document.getElementById('returnsChart').src = data.returns_chart;
+        document.getElementById('correlationChart').src = data.correlation_chart;
+
+        // Display tables
+        this.displayStockPrices(data.stock_prices);
+        this.displayEigenData(data.eigenvalues, data.eigenvectors);
+
+        // Show results
+        document.getElementById('resultsSection').classList.remove('hidden');
+    }
+
+    displayStockPrices(pricesData) {
+        const tableBody = document.querySelector('#pricesTable tbody');
+        tableBody.innerHTML = '';
+
+        const dates = Object.keys(pricesData).sort().slice(-5);
+
+        dates.forEach(date => {
+            const row = document.createElement('tr');
+            const dateCell = document.createElement('td');
+            dateCell.textContent = new Date(date).toLocaleDateString();
+            row.appendChild(dateCell);
+
+            const stocks = ['RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ITC.NS'];
+            stocks.forEach(stock => {
+                const priceCell = document.createElement('td');
+                priceCell.textContent = `₹${pricesData[date][stock].toFixed(2)}`;
+                row.appendChild(priceCell);
+            });
+
+            tableBody.appendChild(row);
+        });
+    }
+
+    displayEigenData(eigenvalues, eigenvectors) {
+        const tableBody = document.querySelector('#eigenTable tbody');
+        tableBody.innerHTML = '';
+
+        eigenvalues.forEach((eigenvalue, index) => {
+            const row = document.createElement('tr');
+            
+            const compCell = document.createElement('td');
+            compCell.textContent = `PC${index + 1}`;
+            compCell.style.fontWeight = 'bold';
+            row.appendChild(compCell);
+
+            const evalCell = document.createElement('td');
+            evalCell.textContent = eigenvalue.toFixed(6);
+            row.appendChild(evalCell);
+
+            eigenvectors[index].forEach((value) => {
+                const vecCell = document.createElement('td');
+                vecCell.textContent = value.toFixed(4);
+                row.appendChild(vecCell);
+            });
+
+            tableBody.appendChild(row);
+        });
+    }
+
+    showLoading(show) {
+        const spinner = document.getElementById('loadingSpinner');
+        if (show) {
+            spinner.classList.remove('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+        } else {
+            spinner.classList.add('hidden');
+        }
+    }
+
+    showError(message) {
+        alert('Error: ' + message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    new StockAnalysisApp();
+});
